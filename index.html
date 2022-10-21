@@ -1,0 +1,163 @@
+<!DOCTYPE HTML>
+<html lang="en">
+
+<head>
+  <title> 3D Earth </title>
+  <script src="webgl-debug.js"></script>
+  <script type="text/javascript" src="glMatrix.js"></script>
+  <script src="webgl-utils.js"></script>
+  <meta charset="utf-8">
+
+
+
+  <script id="shader-vs" type="x-shader/x-vertex">
+
+    attribute vec3 aVertexPosition;
+    attribute vec3 aVertexNormal;
+    attribute vec2 aTextureCoordinates;
+
+    uniform mat4 uMVMatrix;
+    uniform mat4 uPMatrix;
+    uniform mat3 uNMatrix;
+
+    uniform vec3 uLightPosition;
+    uniform vec3 uAmbientLightColor;
+    uniform vec3 uDiffuseLightColor;
+    uniform vec3 uSpecularLightColor;
+
+    varying vec2 vTextureCoordinates;
+    varying vec3 vLightWeighting;
+
+    const float shininess = 32.0;
+
+    void main(){
+
+      // get vertex position
+      vec4 vertexPositionEye4 = uMVMatrix * vec4(aVertexPosition, 1.0);
+      vec3 vertexPositionEye3 = vertexPositionEye4.xyz/vertexPositionEye4.w;
+
+      // Calculate vector to light source (L)
+      vec3 vectorToLightSource = normalize(uLightPosition - vertexPositionEye3);
+
+      // Transform normal (N)
+      vec3 normalEye = normalize(uNMatrix * aVertexNormal);
+
+      // Calculate N.L for diffuse
+      float diffuseLightWeighting = max(dot(normalEye,vectorToLightSource),0.0);
+
+      // Calculate reflection vector (R) for specular
+      vec3 reflectionVector = normalize(reflect(-vectorToLightSource,normalEye));
+
+      // Calculate view vector (V)
+      vec3 viewvectorEye = -normalize(vertexPositionEye3);
+
+      float rdotv = max(dot(reflectionVector,viewvectorEye),0.0);
+
+      float specularLightWeighting = pow(rdotv,shininess);
+
+      // Sum and send to fragment shader
+      vLightWeighting = uAmbientLightColor +
+                        uDiffuseLightColor * diffuseLightWeighting +
+                        uSpecularLightColor * specularLightWeighting;
+
+      // Transform geometry
+      gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition,1.0);
+      vTextureCoordinates=aTextureCoordinates;
+    }
+
+  </script>
+
+
+
+  <script id="shader-fs" type="x-shader/x-fragment">
+
+    precision mediump float;
+    varying vec2 vTextureCoordinates;
+    varying vec3 vLightWeighting;
+    uniform sampler2D uSampler;
+
+    void main(){
+      vec4 texelColor = texture2D(uSampler,vTextureCoordinates);
+      gl_FragColor = vec4(vLightWeighting.rgb*texelColor.rgb,texelColor.a);
+    }
+
+  </script>
+
+
+
+  <!--JavaScript code-->
+  <script src="earthProgram.js"></script>
+
+
+
+</head>
+
+<body onload="startup();">
+  <canvas id="myGLCanvas" width="500" height="500"></canvas>
+  <div style="font-family:courier;">
+
+	  <div> FPS: <span id="fps">--</span></div>
+	  <div> Orbit Radius: <span id="orbitRadius">--</span></div>
+	  <div> Orbits Per Minute: <span id="orbitRPM">--</span></div>
+
+	  <h3 style="margin-bottom:0;">Controls:</h3>
+
+	  <style>
+		td {
+			padding-right:0.5em;
+			border:none;
+			border-bottom: 1px solid #ddd;
+		}
+		tr:hover {background-color: #f5f5f5}
+		table{
+			border: none;
+			margin-bottom:1em;
+		}
+	  </style>
+
+		<table>
+			<tr>
+				<td>Right arrow</td>
+				<td>Accelerate satellite clockwise</td>
+			</tr>
+			<tr>
+				<td>Left arrow</td>
+				<td>Accelerate satellite anticlockwise</td>
+			</tr>
+			<tr>
+				<td>Up arrow</td>
+				<td>Increase orbit radius</td>
+			</tr>
+			<tr>
+				<td>Down arrow</td>
+				<td>Decrease orbit radius</td>
+			</tr>
+
+			<tr style="margin-top:0.5em;">
+				<td>Mouse drag</td>
+				<td>Rotate camera</td>
+			</tr>
+      <tr>
+				<td>Mouse drag + Ctrl</td>
+				<td>Move camera on X axis</td>
+			</tr>
+      <tr>
+				<td>Mouse drag + Alt</td>
+				<td>Move camera on Y axis</td>
+			</tr>
+			<tr>
+				<td>Mouse drag + Shift</td>
+				<td>Move camera on Z axis</td>
+			</tr>
+			<tr>
+				<td>Mouse wheel</td>
+				<td>Zoom</td>
+			</tr>
+		</table>
+
+	  Note: Satellite speed is treated as angular velocity meaning an increase in orbit radius will not affect orbital period.
+  </div>
+
+</body>
+
+</html>
